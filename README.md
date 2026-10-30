@@ -112,7 +112,16 @@ files.
   network. It refuses dotfiles (so `.git/` is never served), rejects non-`GET`/`HEAD` requests,
   and returns `400` on a malformed URL instead of crashing.
 
-If you find a security problem, please open an issue.
+### One caveat about the hosted copy
+
+`localStorage` is scoped to an *origin*, and every GitHub Pages project site of a given user
+shares one: `https://<user>.github.io`. So anything you save on the hosted copy sits in the same
+storage area as every other Pages site published under that same username, and those pages could
+read it.
+
+Nothing leaves your machine either way, and for a demo this does not matter. But if you are going
+to keep real work in it, **download the file and open it locally** — a local file gets an origin
+of its own, with nothing else in it.
 
 ## Browser support
 
