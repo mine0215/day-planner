@@ -112,16 +112,30 @@ files.
   network. It refuses dotfiles (so `.git/` is never served), rejects non-`GET`/`HEAD` requests,
   and returns `400` on a malformed URL instead of crashing.
 
-### One caveat about the hosted copy
+### Why the hosted copy forgets
 
-`localStorage` is scoped to an *origin*, and every GitHub Pages project site of a given user
-shares one: `https://<user>.github.io`. So anything you save on the hosted copy sits in the same
-storage area as every other Pages site published under that same username, and those pages could
-read it.
+Browser storage is scoped to an *origin*, and every GitHub Pages project site of a given user
+shares one: `https://<user>.github.io`. Anything the hosted copy saved to `localStorage` would
+therefore sit in the same storage area as every other page published under that account.
 
-Nothing leaves your machine either way, and for a demo this does not matter. But if you are going
-to keep real work in it, **download the file and open it locally** — a local file gets an origin
-of its own, with nothing else in it.
+So the hosted copy does not use `localStorage`. It uses `sessionStorage`, which is scoped to the
+tab as well as the origin: no other page can reach it, and it is gone when you close the tab.
+The hosted copy is there to be tried, and it holds nothing worth reading.
+
+**Download the file for real use.** A local file gets an origin of its own, and keeps everything
+in `localStorage` as normal. The switch is one line (`DEMO` in `index.html`) if you want a hosted
+copy of your own to persist.
+
+### No warranty
+
+This is free software published under the MIT license, which states it plainly: the software is
+provided **"as is", without warranty of any kind**, and the author is **not liable** for any
+claim or damage arising from its use. See [LICENSE](LICENSE) for the exact wording.
+
+Nothing here collects data. There are no accounts, no cookies, no analytics, and no server that
+receives anything — your entries never leave your browser. Your data is yours to keep, and yours
+to lose: browsers can clear their own storage, so **use Export for anything you cannot afford to
+lose.**
 
 ## Browser support
 
@@ -142,8 +156,11 @@ FullCalendar is bundled under its own MIT license; see
 **[ブラウザで開く →](https://mine0215.github.io/day-planner/)**
 
 タスク盤と、10分刻みの1日の時間割を並べた、HTML 1枚のツールです。
-上のリンクで開いた場合も、入力した内容は**あなたのブラウザの中だけ**に保存されます。
-どこにも送信されません。
+上のリンクで開いた場合、入力した内容は**そのタブの中だけ**に残り、タブを閉じると消えます。
+どこにも送信されません。**実際に使う分はファイルをダウンロードしてください**（そちらは永続保存です）。
+
+MIT ライセンスの無保証条項のとおり、**本ソフトウェアは「現状のまま」提供され、作者は一切の責任を負いません。**
+アカウント・Cookie・アクセス解析はなく、データを受け取るサーバーもありません。
 
 盤からカードを時間割へドラッグすると予定になりますが、**カードは盤から消えません**。同じタスクを
 1日に何度でも置けます。盤は「その案件が今どうなっているか」を、時間割は「いつ手を動かすか」を
