@@ -63,6 +63,12 @@ h1{font-size:16px;font-weight:700;margin:0;letter-spacing:.02em}
 .total span{display:block;font-size:11px;color:var(--ink-soft);letter-spacing:.04em;white-space:nowrap}
 .io{display:flex;gap:6px;align-self:center}
 
+/* Hosted-copy notice. Quiet enough to ignore once read, legible enough not to be missed. */
+.demo-note{flex:0 0 auto;margin:0;padding:7px 11px;border:1px solid var(--line);border-left:3px solid var(--signal);
+  border-radius:7px;background:var(--panel);color:var(--ink-soft);font-size:11.5px;line-height:1.5}
+.demo-note[hidden]{display:none}
+.demo-note a{color:var(--accent);font-weight:600;margin-left:6px}
+
 .panes{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:16px;align-items:stretch;flex:1 1 auto;min-height:0}
 
 .board{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0;max-height:100%;overflow-y:auto}
@@ -207,6 +213,10 @@ footer.note code{font-family:var(--font-mono)}
     </div>
   </header>
 
+  <!-- Shown only on the hosted copy, which keeps nothing after the tab closes. -->
+  <p class="demo-note" id="demo-note" hidden><span class="t"></span>
+    <a href="https://github.com/mine0215/day-planner" rel="noopener noreferrer"></a></p>
+
   <div class="panes">
     <section class="board" id="board">
       <div class="board-head"><h2 data-i18n="boardTitle"></h2></div>
@@ -267,6 +277,7 @@ footer.note code{font-family:var(--font-mono)}
       toastSaveFail:"Could not save (check your browser settings)",
       toastImported:"Imported ({n} tasks)", toastImportFail:"Could not import: {msg}",
       errFormat:"unrecognised format",
+      demoNotice:"This is the hosted copy — what you enter stays in this tab only and is gone when you close it.", demoGet:"Download it to keep your work",
       durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
     },
     ja:{
@@ -290,6 +301,7 @@ footer.note code{font-family:var(--font-mono)}
       toastSaveFail:"保存できませんでした（ブラウザの設定を確認してください）",
       toastImported:"読み込みました（タスク {n} 件）", toastImportFail:"読み込めませんでした: {msg}",
       errFormat:"形式が違います",
+      demoNotice:"これは公開版です。入力した内容はこのタブの中だけに残り、閉じると消えます。", demoGet:"保存して使うにはダウンロード",
       durM:"{m}分", durH:"{h}時間", durHM:"{h}時間{m}分"
     },
     "zh-Hans":{
@@ -313,6 +325,7 @@ footer.note code{font-family:var(--font-mono)}
       toastSaveFail:"无法保存（请检查浏览器设置）",
       toastImported:"已导入（{n} 个任务）", toastImportFail:"无法导入：{msg}",
       errFormat:"格式不正确",
+      demoNotice:"这是在线版。您输入的内容只保存在当前标签页中，关闭后即消失。", demoGet:"下载后可长期保存",
       durM:"{m} 分钟", durH:"{h} 小时", durHM:"{h} 小时 {m} 分"
     },
     "zh-Hant":{
@@ -336,6 +349,7 @@ footer.note code{font-family:var(--font-mono)}
       toastSaveFail:"無法儲存（請檢查瀏覽器設定）",
       toastImported:"已匯入（{n} 個任務）", toastImportFail:"無法匯入：{msg}",
       errFormat:"格式不正確",
+      demoNotice:"這是線上版。您輸入的內容只保存在目前分頁中，關閉後即消失。", demoGet:"下載後可長期保存",
       durM:"{m} 分鐘", durH:"{h} 小時", durHM:"{h} 小時 {m} 分"
     },
     ko:{
@@ -359,6 +373,7 @@ footer.note code{font-family:var(--font-mono)}
       toastSaveFail:"저장할 수 없습니다(브라우저 설정을 확인하세요)",
       toastImported:"가져왔습니다(작업 {n}개)", toastImportFail:"가져올 수 없습니다: {msg}",
       errFormat:"형식이 올바르지 않습니다",
+      demoNotice:"이것은 온라인 버전입니다. 입력한 내용은 이 탭에만 남고 닫으면 사라집니다.", demoGet:"저장해서 쓰려면 다운로드",
       durM:"{m}분", durH:"{h}시간", durHM:"{h}시간 {m}분"
     },
     es:{
@@ -382,6 +397,7 @@ footer.note code{font-family:var(--font-mono)}
       toastSaveFail:"No se pudo guardar (revisa la configuración del navegador)",
       toastImported:"Importado ({n} tareas)", toastImportFail:"No se pudo importar: {msg}",
       errFormat:"formato no reconocido",
+      demoNotice:"Esta es la copia alojada: lo que escribas se queda solo en esta pestaña y desaparece al cerrarla.", demoGet:"Descárgalo para conservar tu trabajo",
       durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
     },
     "pt-BR":{
@@ -405,6 +421,7 @@ footer.note code{font-family:var(--font-mono)}
       toastSaveFail:"Não foi possível salvar (verifique as configurações do navegador)",
       toastImported:"Importado ({n} tarefas)", toastImportFail:"Não foi possível importar: {msg}",
       errFormat:"formato não reconhecido",
+      demoNotice:"Esta é a cópia hospedada: o que você digitar fica apenas nesta aba e some ao fechá-la.", demoGet:"Baixe para manter seu trabalho",
       durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
     },
     fr:{
@@ -428,6 +445,7 @@ footer.note code{font-family:var(--font-mono)}
       toastSaveFail:"Enregistrement impossible (vérifiez les paramètres du navigateur)",
       toastImported:"Importé ({n} tâches)", toastImportFail:"Import impossible : {msg}",
       errFormat:"format non reconnu",
+      demoNotice:"Ceci est la copie hébergée : ce que vous saisissez reste dans cet onglet et disparaît à sa fermeture.", demoGet:"Téléchargez-le pour conserver votre travail",
       durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
     },
     de:{
@@ -451,6 +469,7 @@ footer.note code{font-family:var(--font-mono)}
       toastSaveFail:"Speichern fehlgeschlagen (Browsereinstellungen prüfen)",
       toastImported:"Importiert ({n} Aufgaben)", toastImportFail:"Import fehlgeschlagen: {msg}",
       errFormat:"unbekanntes Format",
+      demoNotice:"Dies ist die gehostete Kopie: Eingaben bleiben nur in diesem Tab und sind nach dem Schließen weg.", demoGet:"Zum dauerhaften Speichern herunterladen",
       durM:"{m} Min.", durH:"{h} Std.", durHM:"{h} Std. {m} Min."
     },
     ru:{
@@ -474,8 +493,25 @@ footer.note code{font-family:var(--font-mono)}
       toastSaveFail:"Не удалось сохранить (проверьте настройки браузера)",
       toastImported:"Импортировано (задач: {n})", toastImportFail:"Не удалось импортировать: {msg}",
       errFormat:"неизвестный формат",
+      demoNotice:"Это онлайн-версия: введённое остаётся только в этой вкладке и исчезает при её закрытии.", demoGet:"Скачайте, чтобы сохранять работу",
       durM:"{m} мин", durH:"{h} ч", durHM:"{h} ч {m} мин"
     }
+  };
+
+  /* Where this copy saves.
+
+     GitHub Pages serves every project site of a user from one origin
+     (https://<user>.github.io), so anything the hosted copy writes to localStorage shares a
+     storage area with every other page that user publishes. The hosted copy therefore keeps
+     nothing durable: sessionStorage is scoped to this tab as well as to the origin, so no
+     other page can read it and nothing is left behind once the tab closes.
+
+     The downloaded file gets an origin of its own and keeps using localStorage, so real use
+     is unaffected. Flip DEMO to false to make a hosted copy persist like the local one. */
+  var DEMO = /(^|\.)github\.io$/i.test(location.hostname);
+  var store = {
+    get: function(k){ try{ return (DEMO ? sessionStorage : localStorage).getItem(k); }catch(e){ return null; } },
+    set: function(k, v){ try{ (DEMO ? sessionStorage : localStorage).setItem(k, v); return true; }catch(e){ return false; } }
   };
 
   var LS_LANG = "day-planner-v1-lang";
@@ -484,7 +520,7 @@ footer.note code{font-family:var(--font-mono)}
   /* Saved choice first, then the browser's own preference order, then English. */
   function pickLang(){
     try{
-      var saved = localStorage.getItem(LS_LANG);
+      var saved = store.get(LS_LANG);
       if(saved && STR[saved]) return saved;
     }catch(e){}
     var wanted = (navigator.languages || [navigator.language || "en"]).slice();
@@ -572,16 +608,16 @@ footer.note code{font-family:var(--font-mono)}
   /* ---------- storage: this browser only ---------- */
   function load(){
     try{
-      var raw = localStorage.getItem(LS_KEY);
+      var raw = store.get(LS_KEY);
       if(!raw) return;
       adopt(JSON.parse(raw));
     }catch(e){}
     try{
-      var r = JSON.parse(localStorage.getItem(LS_KEY+"-range") || "null");
+      var r = JSON.parse(store.get(LS_KEY+"-range") || "null");
       if(r && r.from < r.to) view = {from:r.from, to:r.to, slot:r.slot || 0};
     }catch(e){}
     try{
-      var u = JSON.parse(localStorage.getItem(LS_KEY+"-ui") || "null");
+      var u = JSON.parse(store.get(LS_KEY+"-ui") || "null");
       if(u && u.collapsed) ui.collapsed = u.collapsed;
     }catch(e){}
   }
@@ -631,9 +667,9 @@ footer.note code{font-family:var(--font-mono)}
   }
   function save(){
     try{
-      localStorage.setItem(LS_KEY, JSON.stringify({
+      if(!store.set(LS_KEY, JSON.stringify({
         version:1, tasks:Array.from(tasks.values()), blocks:Array.from(blocks.values())
-      }));
+      }))) throw new Error("storage unavailable");
     }catch(e){ toast(tr("toastSaveFail")); }
   }
 
@@ -662,7 +698,7 @@ footer.note code{font-family:var(--font-mono)}
 
   function toggleColumn(id){
     ui.collapsed[id] = !ui.collapsed[id];
-    try{ localStorage.setItem(LS_KEY+"-ui", JSON.stringify(ui)); }catch(e){}
+    store.set(LS_KEY+"-ui", JSON.stringify(ui));
     renderBoard();
   }
 
@@ -913,7 +949,7 @@ footer.note code{font-family:var(--font-mono)}
     fitTimer = setTimeout(applySlotHeight, 150);
   });
   function saveView(){
-    try{ localStorage.setItem(LS_KEY+"-range", JSON.stringify(view)); }catch(e){}
+    store.set(LS_KEY+"-range", JSON.stringify(view));
   }
 
   function initRange(){
@@ -1153,16 +1189,29 @@ footer.note code{font-family:var(--font-mono)}
     sel.addEventListener("change", function(){
       if(!STR[sel.value]) return;
       lang = sel.value;
-      try{ localStorage.setItem(LS_LANG, lang); }catch(e){}
+      store.set(LS_LANG, lang);
       applyStatic();
+      applyDemoNotice();
       if(calendar) calendar.setOption("locale", fcLocale());
       renderAll();
     });
   }
 
+  /* The hosted copy says so, in the chosen language: anyone trying it should know the
+     tab is the only place their entries live. */
+  function applyDemoNotice(){
+    if(!DEMO) return;
+    var el = document.getElementById("demo-note");
+    if(!el) return;
+    el.hidden = false;
+    el.querySelector(".t").textContent = tr("demoNotice");
+    el.querySelector("a").textContent = tr("demoGet");
+  }
+
   /* ---------- boot ---------- */
   registerLocales();
   applyStatic();
+  applyDemoNotice();
   load();
   applySlotHeight();
   initCalendar();
