@@ -1,0 +1,1176 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- The app is offline by design. This makes the browser enforce it rather than leaving it
+     as a promise: connect-src 'none' blocks fetch/XHR/WebSocket/beacon outright, and
+     default-src 'none' means nothing is loaded from anywhere but this folder. -->
+<!-- font-src data: is for FullCalendar's embedded arrow-icon font, which is inlined in the
+     bundle and loads nothing from the network. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>Day Planner</title>
+<script src="vendor/fullcalendar.min.js"></script>
+<style>
+/* Layout: task board on the left, a 10-minute day grid on the right; stacks to one column on a narrow window. */
+/* Theme: Quiet Desk — low-chroma surfaces, one accent, hour lines stronger than ten-minute lines. */
+:root{
+  --bg:#eef0f3;
+  --panel:#ffffff;
+  --panel-2:#f5f6f8;
+  --ink:#191d23;
+  --ink-soft:#67707d;
+  --line:#dde0e6;
+  --line-strong:#c3c8d1;
+  --accent:#2c6e63;
+  --accent-soft:#e4efec;
+  --signal:#c05621;
+  --radius:8px;
+  --slot-h:9px;
+  --label-fs:8px;
+  --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:Consolas,"SFMono-Regular",Menlo,"Courier New",monospace;
+  color-scheme:light;
+}
+/* Per-language UI font. A Japanese-first stack renders Chinese and Korean with the wrong
+   glyph variants, so each script picks its own system face. Set from the <html lang>. */
+html[lang^="ja"]{--font-ui:"Yu Gothic UI","Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",system-ui,sans-serif}
+html[lang="zh-Hans"]{--font-ui:"Microsoft YaHei UI","PingFang SC","Noto Sans SC",system-ui,sans-serif}
+html[lang="zh-Hant"]{--font-ui:"Microsoft JhengHei UI","PingFang TC","Noto Sans TC",system-ui,sans-serif}
+html[lang="ko"]{--font-ui:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#13161a;--panel:#1c2026;--panel-2:#232832;--ink:#e7eaef;--ink-soft:#98a2b0;
+    --line:#2e343d;--line-strong:#434b57;--accent:#5fb8aa;--accent-soft:#1d3a36;--signal:#e08b5c;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#13161a;--panel:#1c2026;--panel-2:#232832;--ink:#e7eaef;--ink-soft:#98a2b0;
+  --line:#2e343d;--line-strong:#434b57;--accent:#5fb8aa;--accent-soft:#1d3a36;--signal:#e08b5c;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:14px;line-height:1.55;margin:0;overflow:hidden}
+/* One screen: the header is fixed height and the panes take everything left over. */
+.wrap{max-width:920px;height:100%;margin:0 auto;padding-left:16px;padding-right:16px;padding-block:12px;display:flex;flex-direction:column;gap:10px}
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;flex:0 0 auto}
+h1{font-size:16px;font-weight:700;margin:0;letter-spacing:.02em}
+.totals{display:flex;gap:16px;margin-left:auto;align-items:flex-end;flex-wrap:wrap}
+.total{text-align:right;min-width:68px}
+.total b{display:block;font-family:var(--font-mono);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.total span{display:block;font-size:11px;color:var(--ink-soft);letter-spacing:.04em;white-space:nowrap}
+.io{display:flex;gap:6px;align-self:center}
+
+.panes{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:16px;align-items:stretch;flex:1 1 auto;min-height:0}
+
+.board{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0;max-height:100%;overflow-y:auto}
+.board-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.board-head h2{font-size:13px;font-weight:700;margin:0;letter-spacing:.08em;color:var(--ink-soft)}
+.hint{font-size:11.5px;color:var(--ink-soft);margin:0 0 12px;line-height:1.5}
+.cols{display:flex;flex-direction:column;gap:14px}
+.col-head{display:flex;align-items:center;gap:7px;width:100%;padding:3px 2px;margin-bottom:6px;border:0;background:transparent;cursor:pointer;
+  font-size:12px;font-weight:700;color:var(--ink-soft);letter-spacing:.06em;text-align:left;border-radius:5px}
+.col-head:hover{background:var(--panel-2);color:var(--ink)}
+.col-head .count{font-family:var(--font-mono);font-weight:600;opacity:.8;margin-left:auto}
+.col-head .chev{font-size:10px;line-height:1;transition:transform .12s ease}
+.col-head[aria-expanded="false"] .chev{transform:rotate(-90deg)}
+.col-head[aria-expanded="false"]{color:var(--ink-soft);opacity:.85}
+.col-list{display:flex;flex-direction:column;gap:7px;min-height:8px}
+.col-list[hidden]{display:none} /* a class selector would otherwise beat the browser's own [hidden] rule */
+.card{position:relative;background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--c,var(--accent));border-radius:7px;padding:8px 30px 8px 10px;cursor:grab;touch-action:none;min-width:0}
+.card:active{cursor:grabbing}
+.card.done{opacity:.55}
+.card.done .title{text-decoration:line-through}
+.card .title{font-size:13.5px;font-weight:500;overflow-wrap:anywhere}
+.card .meta{display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-soft);margin-top:2px;font-variant-numeric:tabular-nums}
+.card .note{font-size:11.5px;color:var(--ink-soft);margin-top:5px;padding-top:5px;border-top:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card .placed{color:var(--accent);font-weight:600}
+.card .edit{position:absolute;top:5px;right:4px;width:22px;height:22px;border:0;border-radius:5px;background:transparent;color:var(--ink-soft);font-size:14px;line-height:1;cursor:pointer}
+.card .edit:hover{background:var(--line);color:var(--ink)}
+.empty{font-size:12px;color:var(--ink-soft);border:1px dashed var(--line);border-radius:7px;padding:10px;text-align:center}
+.col.drop-target{outline:2px dashed var(--accent);outline-offset:3px;border-radius:7px;background:var(--accent-soft)}
+.seg{display:flex;gap:6px}
+.seg button{flex:1 1 0;min-width:0;padding:7px 4px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);cursor:pointer;font-size:12.5px}
+.seg button:hover{background:var(--panel-2)}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.add-row{display:flex;gap:7px;margin-top:12px}
+input,select,textarea,button{font-family:inherit;font-size:13px;color:inherit}
+.add-row input{flex:1 1 auto;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg)}
+button.primary{background:var(--accent);color:#fff;border:0;border-radius:7px;padding:8px 13px;font-weight:700;cursor:pointer}
+button.primary:hover{filter:brightness(1.08)}
+button.ghost{background:transparent;border:1px solid var(--line);border-radius:7px;padding:6px 11px;cursor:pointer;color:var(--ink);font-size:12px}
+button.ghost:hover{background:var(--panel-2)}
+button.danger{background:transparent;border:1px solid var(--signal);color:var(--signal);border-radius:7px;padding:7px 12px;cursor:pointer}
+button.danger:hover{background:var(--signal);color:#fff}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.sched{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 10px 8px;min-width:0;height:100%;display:flex;flex-direction:column}
+.range{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft)}
+.range select{padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);font-family:var(--font-mono)}
+#cal{flex:1 1 auto;min-height:0}
+.fc{height:100%}
+
+/* Narrow windows: drop the one-screen layout and let the page scroll normally. */
+@media (max-width:860px){
+  html,body{height:auto;overflow:visible}
+  .wrap{height:auto;padding-block:12px 24px}
+  .panes{grid-template-columns:minmax(0,1fr);flex:0 0 auto}
+  .board{max-height:none;overflow:visible}
+  .sched{height:auto}
+  #cal{min-height:460px}
+}
+.fc{
+  --fc-border-color:var(--line);
+  --fc-page-bg-color:var(--panel);
+  --fc-neutral-bg-color:var(--panel-2);
+  --fc-today-bg-color:transparent; /* a single-day view: tinting the whole column says nothing */
+  --fc-now-indicator-color:var(--signal);
+  --fc-small-font-size:11.5px;
+  font-family:var(--font-ui);
+}
+.fc .fc-toolbar-title{font-size:15px;font-weight:700}
+.fc .fc-button{background:transparent;border:1px solid var(--line);color:var(--ink);box-shadow:none;font-size:12.5px;padding:4px 9px}
+.fc .fc-button:hover{background:var(--panel-2);border-color:var(--line);color:var(--ink)}
+.fc .fc-button-primary:not(:disabled):active,.fc .fc-button-primary:not(:disabled).fc-button-active{background:var(--accent);border-color:var(--accent);color:#fff}
+.fc .fc-timegrid-slot-label{position:relative;font-family:var(--font-mono);font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+/* The hour label never exceeds the slot height, so every 10-minute row is exactly --slot-h
+   and the events stay lined up with the hour rules. */
+.fc .fc-timegrid-slot-label-cushion{display:inline-block;white-space:nowrap;padding:0 6px;line-height:1;font-size:var(--label-fs)}
+.fc .fc-timegrid-axis-cushion{font-size:10.5px}
+.fc .fc-timegrid-slot{height:var(--slot-h);font-size:0;line-height:0;border-top-color:var(--line-strong)}
+.fc .fc-timegrid-slot-minor{border-top-style:dotted;border-top-color:var(--line)}
+.fc .fc-timegrid-event{font-size:11px;line-height:1.3}
+.fc .fc-timegrid-event .fc-event-main{padding:0 1px}
+.fc .fc-timegrid-event-short .fc-event-main-frame{gap:5px}
+/* A finished task's block: hollow instead of filled, so the day reads as "done" vs "still to do"
+   at a glance. The border keeps the task's own colour. */
+.fc .fc-event.blk-done{background-color:var(--panel-2)!important;border-style:dashed!important;border-width:1px!important}
+.fc .fc-event.blk-done .fc-event-main{color:var(--ink-soft)}
+.fc .fc-event.blk-done .fc-event-title{text-decoration:line-through;text-decoration-thickness:1px}
+.fc-theme-standard td,.fc-theme-standard th,.fc-theme-standard .fc-scrollgrid{border-color:var(--line)}
+.fc .fc-event{border:0;border-radius:5px;padding:1px 3px;font-size:11.5px;cursor:pointer}
+.fc .fc-event-main{color:#fff;font-weight:500}
+.fc .fc-event-time{font-family:var(--font-mono);font-weight:600;font-variant-numeric:tabular-nums}
+.fc .fc-highlight{background:var(--accent-soft)}
+.fc .fc-timegrid-now-indicator-line{border-width:2px 0 0}
+
+.scrim{position:fixed;inset:0;background:rgba(10,12,16,.5);display:flex;align-items:center;justify-content:center;padding:20px;z-index:40}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;width:min(380px,100%);display:flex;flex-direction:column;gap:12px}
+.sheet h3{margin:0;font-size:15px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:11.5px;letter-spacing:.06em;color:var(--ink-soft)}
+.field input,.field select,.field textarea{padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);font-size:13px}
+.field textarea{resize:vertical;min-height:62px;line-height:1.5;font-family:inherit}
+.readnote{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12.5px;color:var(--ink-soft);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:8px 10px;max-height:140px;overflow-y:auto}
+.swatches{display:flex;gap:7px;flex-wrap:wrap}
+.sw{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
+.sw[aria-pressed="true"]{border-color:var(--ink)}
+.sheet-actions{display:flex;gap:8px;align-items:center}
+.sheet-actions .spacer{margin-left:auto}
+footer.note{font-size:11.5px;color:var(--ink-soft);text-align:center;margin:0}
+footer.note code{font-family:var(--font-mono)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:12.5px;z-index:50}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 data-i18n="appTitle"></h1>
+    <div class="range">
+      <label for="r-from" data-i18n="rangeLabel"></label>
+      <select id="r-from"></select>
+      <span>–</span>
+      <select id="r-to"></select>
+      <label for="r-dens" data-i18n="densLabel"></label>
+      <select id="r-dens">
+        <option value="0" data-i18n="dens0"></option>
+        <option value="7" data-i18n="dens7"></option>
+        <option value="9" data-i18n="dens9"></option>
+        <option value="13" data-i18n="dens13"></option>
+        <option value="18" data-i18n="dens18"></option>
+      </select>
+      <label for="r-lang" data-i18n="langLabel"></label>
+      <select id="r-lang"></select>
+    </div>
+    <div class="totals">
+      <div class="total"><b id="t-planned">0:00</b><span data-i18n="totalPlanned"></span></div>
+      <div class="total"><b id="t-left">0:00</b><span data-i18n="totalLeft"></span></div>
+      <div class="total"><b id="t-open">0</b><span data-i18n="totalOpen"></span></div>
+    </div>
+    <div class="io">
+      <button class="ghost" id="btn-export" type="button" data-i18n="export"></button>
+      <button class="ghost" id="btn-import" type="button" data-i18n="import"></button>
+      <input type="file" id="file-import" accept="application/json,.json" hidden>
+    </div>
+  </header>
+
+  <div class="panes">
+    <section class="board" id="board">
+      <div class="board-head"><h2 data-i18n="boardTitle"></h2></div>
+      <p class="hint" data-i18n="hint"></p>
+      <div class="cols" id="cols"></div>
+      <form class="add-row" id="add-form">
+        <input id="add-title" data-i18n-placeholder="addPlaceholder" maxlength="80" autocomplete="off">
+        <button class="primary" type="submit" data-i18n="addButton"></button>
+      </form>
+    </section>
+
+    <section class="sched">
+      <div id="cal"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- i18n ----------
+     To add a language: add one entry to LANGS and one block to STR with the same keys.
+     `fc` is the locale code handed to FullCalendar, which formats dates and times with
+     the browser's own Intl data, so no extra locale file is needed. */
+  var LANGS = [
+    {code:"en",      fc:"en",    name:"English"},
+    {code:"ja",      fc:"ja",    name:"日本語"},
+    {code:"zh-Hans", fc:"zh-cn", name:"简体中文"},
+    {code:"zh-Hant", fc:"zh-tw", name:"繁體中文"},
+    {code:"ko",      fc:"ko",    name:"한국어"},
+    {code:"es",      fc:"es",    name:"Español"},
+    {code:"pt-BR",   fc:"pt-br", name:"Português (BR)"},
+    {code:"fr",      fc:"fr",    name:"Français"},
+    {code:"de",      fc:"de",    name:"Deutsch"},
+    {code:"ru",      fc:"ru",    name:"Русский"}
+  ];
+
+  var STR = {
+    en:{
+      appTitle:"Task board & day timetable", rangeLabel:"Range", densLabel:"Density", langLabel:"Language",
+      dens0:"Auto", dens7:"Tight", dens9:"Normal", dens13:"Roomy", dens18:"Max",
+      totalPlanned:"Planned today", totalLeft:"Still to do", totalOpen:"To do",
+      export:"Export", import:"Import",
+      boardTitle:"Task board",
+      hint:"Drag a card right to place it on the day (the card stays). Drag it onto a column to change its state. Click a block to set its length or state, or to remove it.",
+      addPlaceholder:"Add a task", addButton:"Add",
+      colTodo:"To do", colDoing:"In progress", colDone:"Done",
+      emptyTodo:"Add a task in the field below", emptyOther:"Nothing here yet",
+      estPrefix:"Est.", placedPrefix:"Placed", editAria:"Edit",
+      untitled:"(untitled)", deletedTask:"(deleted task)", today:"Today",
+      taskSheetTitle:"Edit task", fTitle:"Title", fNote:"Notes",
+      fNotePlaceholder:"Links, contacts, steps, anything you noticed",
+      fCol:"State", fEst:"Estimate", fColor:"Colour",
+      del:"Delete", close:"Close", save:"Save",
+      bWhen:"Time", bDur:"Length (10-minute steps)", bThis:"This block", bTaskState:"Task state (board)",
+      bRemove:"Remove from timetable", notYet:"Not yet", doneSeg:"Done",
+      toastSaveFail:"Could not save (check your browser settings)",
+      toastImported:"Imported ({n} tasks)", toastImportFail:"Could not import: {msg}",
+      errFormat:"unrecognised format",
+      durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
+    },
+    ja:{
+      appTitle:"タスク盤と1日の時間割", rangeLabel:"表示", densLabel:"密度", langLabel:"言語",
+      dens0:"自動", dens7:"細かい", dens9:"標準", dens13:"ゆったり", dens18:"最大",
+      totalPlanned:"この日の予定", totalLeft:"うち未消化", totalOpen:"未着手",
+      export:"書き出し", import:"読み込み",
+      boardTitle:"タスク盤",
+      hint:"カードを右へドラッグで配置（カードは残ります）。列へドラッグで状態を変更。予定をクリックで長さ・状態・削除。",
+      addPlaceholder:"タスクを追加", addButton:"追加",
+      colTodo:"未着手", colDoing:"進行中", colDone:"完了",
+      emptyTodo:"下の入力欄からタスクを追加", emptyOther:"まだありません",
+      estPrefix:"見込み", placedPrefix:"配置", editAria:"編集",
+      untitled:"(無題)", deletedTask:"(削除済みタスク)", today:"今日",
+      taskSheetTitle:"タスクを編集", fTitle:"タイトル", fNote:"備考",
+      fNotePlaceholder:"リンク、連絡先、手順、気づいたことなど",
+      fCol:"状態", fEst:"見込み時間", fColor:"色",
+      del:"削除", close:"閉じる", save:"保存",
+      bWhen:"時間", bDur:"長さ（10分刻み）", bThis:"この予定", bTaskState:"タスク自体の状態（盤）",
+      bRemove:"時間割から外す", notYet:"まだ", doneSeg:"こなした",
+      toastSaveFail:"保存できませんでした（ブラウザの設定を確認してください）",
+      toastImported:"読み込みました（タスク {n} 件）", toastImportFail:"読み込めませんでした: {msg}",
+      errFormat:"形式が違います",
+      durM:"{m}分", durH:"{h}時間", durHM:"{h}時間{m}分"
+    },
+    "zh-Hans":{
+      appTitle:"任务板与一日时间表", rangeLabel:"显示", densLabel:"密度", langLabel:"语言",
+      dens0:"自动", dens7:"紧凑", dens9:"标准", dens13:"宽松", dens18:"最大",
+      totalPlanned:"当日计划", totalLeft:"其中未完成", totalOpen:"未开始",
+      export:"导出", import:"导入",
+      boardTitle:"任务板",
+      hint:"将卡片向右拖动即可排入当日（卡片会留在板上）。拖到某一列可更改状态。点击时段可设置长度、状态或移除。",
+      addPlaceholder:"添加任务", addButton:"添加",
+      colTodo:"未开始", colDoing:"进行中", colDone:"已完成",
+      emptyTodo:"用下方的输入框添加任务", emptyOther:"暂无内容",
+      estPrefix:"预计", placedPrefix:"已排", editAria:"编辑",
+      untitled:"（无标题）", deletedTask:"（已删除的任务）", today:"今天",
+      taskSheetTitle:"编辑任务", fTitle:"标题", fNote:"备注",
+      fNotePlaceholder:"链接、联系人、步骤、注意事项等",
+      fCol:"状态", fEst:"预计时间", fColor:"颜色",
+      del:"删除", close:"关闭", save:"保存",
+      bWhen:"时间", bDur:"长度（10 分钟为单位）", bThis:"这个时段", bTaskState:"任务本身的状态（板）",
+      bRemove:"从时间表移除", notYet:"未做", doneSeg:"已做",
+      toastSaveFail:"无法保存（请检查浏览器设置）",
+      toastImported:"已导入（{n} 个任务）", toastImportFail:"无法导入：{msg}",
+      errFormat:"格式不正确",
+      durM:"{m} 分钟", durH:"{h} 小时", durHM:"{h} 小时 {m} 分"
+    },
+    "zh-Hant":{
+      appTitle:"任務板與一日時間表", rangeLabel:"顯示", densLabel:"密度", langLabel:"語言",
+      dens0:"自動", dens7:"緊湊", dens9:"標準", dens13:"寬鬆", dens18:"最大",
+      totalPlanned:"當日計畫", totalLeft:"其中未完成", totalOpen:"未開始",
+      export:"匯出", import:"匯入",
+      boardTitle:"任務板",
+      hint:"將卡片向右拖曳即可排入當日（卡片會留在板上）。拖到某一欄可變更狀態。點擊時段可設定長度、狀態或移除。",
+      addPlaceholder:"新增任務", addButton:"新增",
+      colTodo:"未開始", colDoing:"進行中", colDone:"已完成",
+      emptyTodo:"用下方的輸入欄新增任務", emptyOther:"暫無內容",
+      estPrefix:"預估", placedPrefix:"已排", editAria:"編輯",
+      untitled:"（無標題）", deletedTask:"（已刪除的任務）", today:"今天",
+      taskSheetTitle:"編輯任務", fTitle:"標題", fNote:"備註",
+      fNotePlaceholder:"連結、聯絡人、步驟、注意事項等",
+      fCol:"狀態", fEst:"預估時間", fColor:"顏色",
+      del:"刪除", close:"關閉", save:"儲存",
+      bWhen:"時間", bDur:"長度（10 分鐘為單位）", bThis:"這個時段", bTaskState:"任務本身的狀態（板）",
+      bRemove:"從時間表移除", notYet:"未做", doneSeg:"已做",
+      toastSaveFail:"無法儲存（請檢查瀏覽器設定）",
+      toastImported:"已匯入（{n} 個任務）", toastImportFail:"無法匯入：{msg}",
+      errFormat:"格式不正確",
+      durM:"{m} 分鐘", durH:"{h} 小時", durHM:"{h} 小時 {m} 分"
+    },
+    ko:{
+      appTitle:"작업 보드와 하루 시간표", rangeLabel:"표시", densLabel:"밀도", langLabel:"언어",
+      dens0:"자동", dens7:"촘촘하게", dens9:"표준", dens13:"여유롭게", dens18:"최대",
+      totalPlanned:"이 날의 예정", totalLeft:"남은 작업", totalOpen:"미착수",
+      export:"내보내기", import:"가져오기",
+      boardTitle:"작업 보드",
+      hint:"카드를 오른쪽으로 끌면 하루에 배치됩니다(카드는 보드에 남습니다). 열로 끌면 상태가 바뀝니다. 일정을 클릭하면 길이·상태 변경과 삭제를 할 수 있습니다.",
+      addPlaceholder:"작업 추가", addButton:"추가",
+      colTodo:"미착수", colDoing:"진행 중", colDone:"완료",
+      emptyTodo:"아래 입력란에서 작업을 추가하세요", emptyOther:"아직 없습니다",
+      estPrefix:"예상", placedPrefix:"배치", editAria:"편집",
+      untitled:"(제목 없음)", deletedTask:"(삭제된 작업)", today:"오늘",
+      taskSheetTitle:"작업 편집", fTitle:"제목", fNote:"메모",
+      fNotePlaceholder:"링크, 연락처, 절차, 알게 된 점 등",
+      fCol:"상태", fEst:"예상 시간", fColor:"색",
+      del:"삭제", close:"닫기", save:"저장",
+      bWhen:"시간", bDur:"길이(10분 단위)", bThis:"이 일정", bTaskState:"작업 자체의 상태(보드)",
+      bRemove:"시간표에서 제거", notYet:"아직", doneSeg:"완료함",
+      toastSaveFail:"저장할 수 없습니다(브라우저 설정을 확인하세요)",
+      toastImported:"가져왔습니다(작업 {n}개)", toastImportFail:"가져올 수 없습니다: {msg}",
+      errFormat:"형식이 올바르지 않습니다",
+      durM:"{m}분", durH:"{h}시간", durHM:"{h}시간 {m}분"
+    },
+    es:{
+      appTitle:"Tablero de tareas y horario del día", rangeLabel:"Rango", densLabel:"Densidad", langLabel:"Idioma",
+      dens0:"Auto", dens7:"Compacta", dens9:"Normal", dens13:"Amplia", dens18:"Máxima",
+      totalPlanned:"Planificado hoy", totalLeft:"Pendiente", totalOpen:"Por hacer",
+      export:"Exportar", import:"Importar",
+      boardTitle:"Tablero de tareas",
+      hint:"Arrastra una tarjeta a la derecha para colocarla en el día (la tarjeta se queda). Arrástrala a una columna para cambiar su estado. Haz clic en un bloque para ajustar su duración o estado, o para quitarlo.",
+      addPlaceholder:"Añadir tarea", addButton:"Añadir",
+      colTodo:"Por hacer", colDoing:"En curso", colDone:"Hecho",
+      emptyTodo:"Añade una tarea en el campo de abajo", emptyOther:"Todavía no hay nada",
+      estPrefix:"Est.", placedPrefix:"En el día", editAria:"Editar",
+      untitled:"(sin título)", deletedTask:"(tarea eliminada)", today:"Hoy",
+      taskSheetTitle:"Editar tarea", fTitle:"Título", fNote:"Notas",
+      fNotePlaceholder:"Enlaces, contactos, pasos, lo que hayas notado",
+      fCol:"Estado", fEst:"Tiempo estimado", fColor:"Color",
+      del:"Eliminar", close:"Cerrar", save:"Guardar",
+      bWhen:"Hora", bDur:"Duración (pasos de 10 min)", bThis:"Este bloque", bTaskState:"Estado de la tarea (tablero)",
+      bRemove:"Quitar del horario", notYet:"Todavía no", doneSeg:"Hecho",
+      toastSaveFail:"No se pudo guardar (revisa la configuración del navegador)",
+      toastImported:"Importado ({n} tareas)", toastImportFail:"No se pudo importar: {msg}",
+      errFormat:"formato no reconocido",
+      durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
+    },
+    "pt-BR":{
+      appTitle:"Quadro de tarefas e agenda do dia", rangeLabel:"Intervalo", densLabel:"Densidade", langLabel:"Idioma",
+      dens0:"Auto", dens7:"Compacta", dens9:"Normal", dens13:"Espaçosa", dens18:"Máxima",
+      totalPlanned:"Planejado hoje", totalLeft:"Ainda a fazer", totalOpen:"A fazer",
+      export:"Exportar", import:"Importar",
+      boardTitle:"Quadro de tarefas",
+      hint:"Arraste um cartão para a direita para colocá-lo no dia (o cartão permanece). Arraste-o até uma coluna para mudar o estado. Clique em um bloco para ajustar a duração ou o estado, ou para removê-lo.",
+      addPlaceholder:"Adicionar tarefa", addButton:"Adicionar",
+      colTodo:"A fazer", colDoing:"Em andamento", colDone:"Concluído",
+      emptyTodo:"Adicione uma tarefa no campo abaixo", emptyOther:"Ainda não há nada",
+      estPrefix:"Est.", placedPrefix:"No dia", editAria:"Editar",
+      untitled:"(sem título)", deletedTask:"(tarefa excluída)", today:"Hoje",
+      taskSheetTitle:"Editar tarefa", fTitle:"Título", fNote:"Notas",
+      fNotePlaceholder:"Links, contatos, etapas, o que você notou",
+      fCol:"Estado", fEst:"Tempo estimado", fColor:"Cor",
+      del:"Excluir", close:"Fechar", save:"Salvar",
+      bWhen:"Hora", bDur:"Duração (passos de 10 min)", bThis:"Este bloco", bTaskState:"Estado da tarefa (quadro)",
+      bRemove:"Remover da agenda", notYet:"Ainda não", doneSeg:"Feito",
+      toastSaveFail:"Não foi possível salvar (verifique as configurações do navegador)",
+      toastImported:"Importado ({n} tarefas)", toastImportFail:"Não foi possível importar: {msg}",
+      errFormat:"formato não reconhecido",
+      durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
+    },
+    fr:{
+      appTitle:"Tableau de tâches et emploi du temps", rangeLabel:"Plage", densLabel:"Densité", langLabel:"Langue",
+      dens0:"Auto", dens7:"Serrée", dens9:"Normale", dens13:"Aérée", dens18:"Maximale",
+      totalPlanned:"Prévu aujourd'hui", totalLeft:"Reste à faire", totalOpen:"À faire",
+      export:"Exporter", import:"Importer",
+      boardTitle:"Tableau de tâches",
+      hint:"Faites glisser une carte vers la droite pour la placer dans la journée (la carte reste). Déposez-la sur une colonne pour changer son état. Cliquez sur un créneau pour régler sa durée, son état ou le retirer.",
+      addPlaceholder:"Ajouter une tâche", addButton:"Ajouter",
+      colTodo:"À faire", colDoing:"En cours", colDone:"Terminé",
+      emptyTodo:"Ajoutez une tâche dans le champ ci-dessous", emptyOther:"Rien pour l'instant",
+      estPrefix:"Est.", placedPrefix:"Placé", editAria:"Modifier",
+      untitled:"(sans titre)", deletedTask:"(tâche supprimée)", today:"Aujourd'hui",
+      taskSheetTitle:"Modifier la tâche", fTitle:"Titre", fNote:"Notes",
+      fNotePlaceholder:"Liens, contacts, étapes, remarques",
+      fCol:"État", fEst:"Durée estimée", fColor:"Couleur",
+      del:"Supprimer", close:"Fermer", save:"Enregistrer",
+      bWhen:"Heure", bDur:"Durée (pas de 10 min)", bThis:"Ce créneau", bTaskState:"État de la tâche (tableau)",
+      bRemove:"Retirer de l'emploi du temps", notYet:"Pas encore", doneSeg:"Fait",
+      toastSaveFail:"Enregistrement impossible (vérifiez les paramètres du navigateur)",
+      toastImported:"Importé ({n} tâches)", toastImportFail:"Import impossible : {msg}",
+      errFormat:"format non reconnu",
+      durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
+    },
+    de:{
+      appTitle:"Aufgabenboard und Tagesplan", rangeLabel:"Bereich", densLabel:"Dichte", langLabel:"Sprache",
+      dens0:"Auto", dens7:"Kompakt", dens9:"Normal", dens13:"Luftig", dens18:"Maximal",
+      totalPlanned:"Heute geplant", totalLeft:"Noch offen", totalOpen:"Offen",
+      export:"Exportieren", import:"Importieren",
+      boardTitle:"Aufgabenboard",
+      hint:"Karte nach rechts ziehen, um sie in den Tag zu legen (die Karte bleibt). Auf eine Spalte ziehen ändert den Status. Auf einen Block klicken für Dauer, Status oder Entfernen.",
+      addPlaceholder:"Aufgabe hinzufügen", addButton:"Hinzufügen",
+      colTodo:"Offen", colDoing:"In Arbeit", colDone:"Fertig",
+      emptyTodo:"Unten im Feld eine Aufgabe hinzufügen", emptyOther:"Noch nichts vorhanden",
+      estPrefix:"Gesch.", placedPrefix:"Geplant", editAria:"Bearbeiten",
+      untitled:"(ohne Titel)", deletedTask:"(gelöschte Aufgabe)", today:"Heute",
+      taskSheetTitle:"Aufgabe bearbeiten", fTitle:"Titel", fNote:"Notizen",
+      fNotePlaceholder:"Links, Kontakte, Schritte, Beobachtungen",
+      fCol:"Status", fEst:"Geschätzte Dauer", fColor:"Farbe",
+      del:"Löschen", close:"Schließen", save:"Speichern",
+      bWhen:"Zeit", bDur:"Dauer (10-Minuten-Schritte)", bThis:"Dieser Block", bTaskState:"Status der Aufgabe (Board)",
+      bRemove:"Aus dem Tagesplan entfernen", notYet:"Noch nicht", doneSeg:"Erledigt",
+      toastSaveFail:"Speichern fehlgeschlagen (Browsereinstellungen prüfen)",
+      toastImported:"Importiert ({n} Aufgaben)", toastImportFail:"Import fehlgeschlagen: {msg}",
+      errFormat:"unbekanntes Format",
+      durM:"{m} Min.", durH:"{h} Std.", durHM:"{h} Std. {m} Min."
+    },
+    ru:{
+      appTitle:"Доска задач и расписание дня", rangeLabel:"Диапазон", densLabel:"Плотность", langLabel:"Язык",
+      dens0:"Авто", dens7:"Плотно", dens9:"Обычно", dens13:"Свободно", dens18:"Максимум",
+      totalPlanned:"План на день", totalLeft:"Осталось", totalOpen:"К выполнению",
+      export:"Экспорт", import:"Импорт",
+      boardTitle:"Доска задач",
+      hint:"Перетащите карточку вправо, чтобы поставить её в расписание (карточка останется на доске). Перетащите на колонку, чтобы изменить статус. Нажмите на блок, чтобы задать длительность, статус или убрать его.",
+      addPlaceholder:"Добавить задачу", addButton:"Добавить",
+      colTodo:"К выполнению", colDoing:"В работе", colDone:"Готово",
+      emptyTodo:"Добавьте задачу в поле ниже", emptyOther:"Пока ничего нет",
+      estPrefix:"Оценка", placedPrefix:"В плане", editAria:"Изменить",
+      untitled:"(без названия)", deletedTask:"(удалённая задача)", today:"Сегодня",
+      taskSheetTitle:"Изменить задачу", fTitle:"Название", fNote:"Заметки",
+      fNotePlaceholder:"Ссылки, контакты, шаги, замечания",
+      fCol:"Статус", fEst:"Оценка времени", fColor:"Цвет",
+      del:"Удалить", close:"Закрыть", save:"Сохранить",
+      bWhen:"Время", bDur:"Длительность (шаг 10 минут)", bThis:"Этот блок", bTaskState:"Статус задачи (доска)",
+      bRemove:"Убрать из расписания", notYet:"Ещё нет", doneSeg:"Сделано",
+      toastSaveFail:"Не удалось сохранить (проверьте настройки браузера)",
+      toastImported:"Импортировано (задач: {n})", toastImportFail:"Не удалось импортировать: {msg}",
+      errFormat:"неизвестный формат",
+      durM:"{m} мин", durH:"{h} ч", durHM:"{h} ч {m} мин"
+    }
+  };
+
+  var LS_LANG = "day-planner-v1-lang";
+  var lang = pickLang();
+
+  /* Saved choice first, then the browser's own preference order, then English. */
+  function pickLang(){
+    try{
+      var saved = localStorage.getItem(LS_LANG);
+      if(saved && STR[saved]) return saved;
+    }catch(e){}
+    var wanted = (navigator.languages || [navigator.language || "en"]).slice();
+    for(var i=0; i<wanted.length; i++){
+      var w = String(wanted[i]);
+      if(STR[w]) return w;
+      var low = w.toLowerCase();
+      // zh-TW / zh-HK / zh-MO are traditional; any other zh is treated as simplified.
+      if(low.indexOf("zh") === 0) return /tw|hk|mo|hant/.test(low) ? "zh-Hant" : "zh-Hans";
+      if(low.indexOf("pt") === 0) return "pt-BR";
+      var base = low.split("-")[0];
+      var hit = LANGS.filter(function(l){ return l.code.toLowerCase().split("-")[0] === base; })[0];
+      if(hit) return hit.code;
+    }
+    return "en";
+  }
+  function tr(key, vars){
+    var s = STR[lang] && STR[lang][key];
+    if(s == null) s = STR.en[key];
+    if(s == null) return key;
+    if(vars) Object.keys(vars).forEach(function(k){ s = s.split("{"+k+"}").join(vars[k]); });
+    return s;
+  }
+  function fcLocale(){
+    var hit = LANGS.filter(function(l){ return l.code === lang; })[0];
+    return hit ? hit.fc : "en";
+  }
+  /* Register the locale codes used here so FullCalendar formats dates with the browser's
+     Intl data and labels its buttons from this table. */
+  function registerLocales(){
+    if(!window.FullCalendar || !FullCalendar.globalLocales) return;
+    LANGS.forEach(function(l){
+      // Only `today` is overridden: prev/next keep FullCalendar's own arrow icons.
+      FullCalendar.globalLocales.push({code: l.fc, buttonText: {today: STR[l.code].today}});
+    });
+  }
+  /* Fills every element carrying data-i18n / data-i18n-placeholder. */
+  function applyStatic(){
+    document.documentElement.lang = lang;
+    document.title = tr("appTitle");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-i18n]"), function(el){
+      el.textContent = tr(el.dataset.i18n);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-i18n-placeholder]"), function(el){
+      el.placeholder = tr(el.dataset.i18nPlaceholder);
+    });
+  }
+
+  var COLORS = ["#2c6e63","#33618c","#8a5a2b","#74487f","#2f6a42","#95384b"];
+  var COLUMNS = [
+    {id:"todo",  key:"colTodo"},
+    {id:"doing", key:"colDoing"},
+    {id:"done",  key:"colDone"}
+  ];
+  var SNAP = 10;
+  var LS_KEY = "day-planner-v1";
+
+  var tasks = new Map();
+  var blocks = new Map();
+  var calendar = null, curDate = todayStr();
+  var view = {from:8, to:19, slot:0}; // slot 0 = fit the window
+  var ui = {collapsed:{}};            // which board columns are folded away
+
+  function todayStr(){
+    var d = new Date();
+    return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  }
+  function pad(n){ return (n<10?"0":"")+n; }
+  /* Translations are concatenated into innerHTML, so quotes and angle brackets
+     in a language file must not be able to break out of an attribute. */
+  function esc(v){ return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+  function hhmm(min){ return pad(Math.floor(min/60)) + ":" + pad(min%60); }
+  function dur(min){ return Math.floor(min/60) + ":" + pad(min%60); }
+  function minsOf(date){ return date.getHours()*60 + date.getMinutes(); }
+  function isoLocal(dateStr, min){ return dateStr + "T" + hhmm(min) + ":00"; }
+  function clampDur(m){ return Math.max(SNAP, Math.round(m/SNAP)*SNAP); }
+  function fmtMin(m){
+    var h = Math.floor(m/60), r = m%60;
+    if(!h) return tr("durM", {m:r});
+    if(!r) return tr("durH", {h:h});
+    return tr("durHM", {h:h, m:r});
+  }
+
+  /* ---------- storage: this browser only ---------- */
+  function load(){
+    try{
+      var raw = localStorage.getItem(LS_KEY);
+      if(!raw) return;
+      adopt(JSON.parse(raw));
+    }catch(e){}
+    try{
+      var r = JSON.parse(localStorage.getItem(LS_KEY+"-range") || "null");
+      if(r && r.from < r.to) view = {from:r.from, to:r.to, slot:r.slot || 0};
+    }catch(e){}
+    try{
+      var u = JSON.parse(localStorage.getItem(LS_KEY+"-ui") || "null");
+      if(u && u.collapsed) ui.collapsed = u.collapsed;
+    }catch(e){}
+  }
+  /* An imported file is untrusted input: it may be hand-edited, corrupted, or sent by
+     someone else. Every field is coerced to the expected type and clamped to a usable
+     range, and anything unrecognised falls back instead of reaching the UI. */
+  var COL_IDS = COLUMNS.map(function(c){ return c.id; });
+  function asText(v, max){ return String(v == null ? "" : v).slice(0, max); }
+  function asNum(v, lo, hi, dflt){
+    var n = Math.round(Number(v));
+    return isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
+  }
+  function asColor(v){ return /^#[0-9a-fA-F]{6}$/.test(v) ? String(v) : COLORS[0]; }
+  function adopt(d){
+    if(!d || typeof d !== "object") return;
+    tasks = new Map(); blocks = new Map();
+    (Array.isArray(d.tasks) ? d.tasks : []).forEach(function(t){
+      if(!t || typeof t !== "object" || !t.id) return;
+      var id = asText(t.id, 64);
+      tasks.set(id, {
+        id: id,
+        title: asText(t.title, 200) || tr("untitled"),
+        note: asText(t.note, 2000),
+        col: COL_IDS.indexOf(t.col) >= 0 ? t.col : "todo",
+        estMin: asNum(t.estMin, SNAP, 24*60, 30),
+        color: asColor(t.color),
+        order: asNum(t.order, 0, Number.MAX_SAFE_INTEGER, 0)
+      });
+    });
+    (Array.isArray(d.blocks) ? d.blocks : []).forEach(function(b){
+      if(!b || typeof b !== "object" || !b.id) return;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return;
+      // Blocks written before they had their own "done" flag inherit it once from the task,
+      // so nothing that already looked finished turns unfinished.
+      var t = tasks.get(asText(b.taskId, 64));
+      var done = typeof b.done === "boolean" ? b.done : !!(t && t.col === "done");
+      var id = asText(b.id, 64);
+      blocks.set(id, {
+        id: id,
+        taskId: asText(b.taskId, 64),
+        date: String(b.date),
+        startMin: asNum(b.startMin, 0, 24*60 - SNAP, 0),
+        durMin: asNum(b.durMin, SNAP, 24*60, 30),
+        done: done
+      });
+    });
+  }
+  function save(){
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        version:1, tasks:Array.from(tasks.values()), blocks:Array.from(blocks.values())
+      }));
+    }catch(e){ toast(tr("toastSaveFail")); }
+  }
+
+  function putTask(t){ tasks.set(t.id,t); save(); renderAll(); }
+  function dropTask(id){
+    tasks.delete(id);
+    Array.from(blocks.values()).forEach(function(b){ if(b.taskId===id) blocks.delete(b.id); });
+    save(); renderAll();
+  }
+  function putBlock(b){ blocks.set(b.id,b); save(); renderAll(); }
+  function dropBlock(id){ blocks.delete(id); save(); renderAll(); }
+
+  /* ---------- task board ---------- */
+  var colsEl = document.getElementById("cols");
+
+  function tasksIn(colId){
+    return Array.from(tasks.values())
+      .filter(function(t){ return t.col === colId; })
+      .sort(function(a,b){ return (a.order||0) - (b.order||0); });
+  }
+  function plannedFor(taskId){
+    var n = 0;
+    blocks.forEach(function(b){ if(b.taskId===taskId && b.date===curDate) n += b.durMin; });
+    return n;
+  }
+
+  function toggleColumn(id){
+    ui.collapsed[id] = !ui.collapsed[id];
+    try{ localStorage.setItem(LS_KEY+"-ui", JSON.stringify(ui)); }catch(e){}
+    renderBoard();
+  }
+
+  function renderBoard(){
+    colsEl.textContent = "";
+    COLUMNS.forEach(function(col){
+      var list = tasksIn(col.id);
+      var collapsed = !!ui.collapsed[col.id];
+      var wrap = document.createElement("div");
+      wrap.className = "col";
+      wrap.dataset.col = col.id;
+
+      var head = document.createElement("button");
+      head.type = "button";
+      head.className = "col-head";
+      head.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      head.innerHTML = '<span class="chev" aria-hidden="true">▾</span><span class="label"></span>' +
+                       '<span class="count">' + list.length + '</span>';
+      head.querySelector(".label").textContent = tr(col.key);
+      head.addEventListener("click", function(){ toggleColumn(col.id); });
+      wrap.appendChild(head);
+
+      var ul = document.createElement("div");
+      ul.className = "col-list";
+      ul.dataset.col = col.id;
+      ul.hidden = collapsed;
+      if(!list.length){
+        var e = document.createElement("div");
+        e.className = "empty";
+        e.textContent = tr(col.id === "todo" ? "emptyTodo" : "emptyOther");
+        ul.appendChild(e);
+      }
+      list.forEach(function(t){
+        var card = document.createElement("div");
+        card.className = "card" + (t.col === "done" ? " done" : "");
+        card.dataset.id = t.id;
+        card.style.setProperty("--c", t.color);
+        var p = plannedFor(t.id);
+        card.innerHTML =
+          '<div class="title"></div>' +
+          '<div class="meta"><span>' + esc(tr("estPrefix")) + ' ' + fmtMin(t.estMin) + '</span>' +
+          (p ? '<span class="placed">' + esc(tr("placedPrefix")) + ' ' + dur(p) + '</span>' : '') + '</div>' +
+          (t.note ? '<div class="note"></div>' : '') +
+          '<button class="edit" type="button" aria-label="' + esc(tr("editAria")) + '">⋯</button>';
+        card.querySelector(".title").textContent = t.title;
+        if(t.note) card.querySelector(".note").textContent = t.note;
+        card.querySelector(".edit").addEventListener("click", function(ev){
+          ev.stopPropagation(); openTaskSheet(t);
+        });
+        ul.appendChild(card);
+      });
+      wrap.appendChild(ul);
+      colsEl.appendChild(wrap);
+    });
+  }
+
+  /* Dragging a card between columns. The calendar's own Draggable is left alone: it keeps
+     showing the drag mirror and does nothing unless the card is dropped on the grid, while
+     this tracks the pointer against the column boxes and moves the task on release. */
+  var cardDrag = null;
+
+  /* The whole column block is the drop zone — header included, so a collapsed column
+     still takes a card. */
+  function columnAt(x, y){
+    var hit = null;
+    Array.prototype.forEach.call(colsEl.querySelectorAll(".col"), function(el){
+      var r = el.getBoundingClientRect();
+      if(x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) hit = el.dataset.col;
+    });
+    return hit;
+  }
+  function markColumn(col){
+    Array.prototype.forEach.call(colsEl.querySelectorAll(".col"), function(el){
+      el.classList.toggle("drop-target", !!col && el.dataset.col === col);
+    });
+  }
+
+  colsEl.addEventListener("pointerdown", function(e){
+    var card = e.target.closest(".card");
+    if(!card || e.target.closest(".edit")) return;
+    cardDrag = {id:card.dataset.id, x:e.clientX, y:e.clientY, active:false};
+  });
+  document.addEventListener("pointermove", function(e){
+    if(!cardDrag) return;
+    if(!cardDrag.active){
+      if(Math.abs(e.clientX - cardDrag.x) + Math.abs(e.clientY - cardDrag.y) < 8) return;
+      cardDrag.active = true;
+    }
+    markColumn(columnAt(e.clientX, e.clientY));
+  });
+  document.addEventListener("pointerup", function(e){
+    if(!cardDrag) return;
+    var drag = cardDrag;
+    cardDrag = null;
+    markColumn(null);
+    if(!drag.active) return;
+    var col = columnAt(e.clientX, e.clientY);
+    var t = tasks.get(drag.id);
+    if(col && t && t.col !== col){ t.col = col; putTask(t); }
+  });
+  document.addEventListener("pointercancel", function(){ cardDrag = null; markColumn(null); });
+
+  function setTaskColumn(taskId, col){
+    var t = tasks.get(taskId);
+    if(t && t.col !== col){ t.col = col; putTask(t); }
+  }
+
+  /* ---------- calendar ---------- */
+  function buildEvents(){
+    var out = [];
+    blocks.forEach(function(b){
+      if(b.date !== curDate) return;
+      var t = tasks.get(b.taskId);
+      var done = !!b.done;
+      out.push({
+        id: b.id,
+        title: (done ? "✓ " : "") + (t ? t.title : tr("deletedTask")),
+        start: isoLocal(b.date, b.startMin),
+        end: isoLocal(b.date, Math.min(24*60, b.startMin + b.durMin)),
+        backgroundColor: t ? t.color : "#6b7280",
+        borderColor: t ? t.color : "#6b7280",
+        classNames: done ? ["blk-done"] : []
+      });
+    });
+    return out;
+  }
+  function renderEvents(){
+    if(!calendar) return;
+    calendar.removeAllEventSources();
+    calendar.addEventSource(buildEvents());
+  }
+  function renderTotals(){
+    var planned = 0, left = 0;
+    blocks.forEach(function(b){
+      if(b.date !== curDate) return;
+      planned += b.durMin;
+      if(!b.done) left += b.durMin;
+    });
+    document.getElementById("t-planned").textContent = dur(planned);
+    document.getElementById("t-left").textContent = dur(left);
+    document.getElementById("t-open").textContent = tasksIn("todo").length;
+  }
+  function renderAll(){ renderBoard(); renderEvents(); renderTotals(); }
+
+  function initCalendar(){
+    calendar = new FullCalendar.Calendar(document.getElementById("cal"), {
+      initialView: "timeGridDay",
+      locale: fcLocale(),
+      height: "100%",
+      expandRows: false,
+      allDaySlot: false,
+      nowIndicator: true,
+      slotDuration: "00:10:00",
+      slotLabelInterval: "01:00",
+      snapDuration: "00:10:00",
+      slotMinTime: pad(view.from) + ":00:00",
+      slotMaxTime: (view.to === 24 ? "24:00:00" : pad(view.to) + ":00:00"),
+      scrollTime: pad(view.from) + ":00:00",
+      editable: true,
+      droppable: true,
+      eventDurationEditable: true,
+      eventResizableFromStart: true,
+      eventOverlap: true,
+      slotEventOverlap: false,
+      dayHeaderFormat: {weekday:"short", month:"numeric", day:"numeric"},
+      headerToolbar: {left:"prev,next today", center:"title", right:""},
+      datesSet: function(info){
+        var d = info.view.currentStart;
+        curDate = d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+        renderBoard(); renderTotals(); renderEvents();
+      },
+      eventReceive: function(info){
+        var taskId = info.event.extendedProps.taskId;
+        var start = minsOf(info.event.start);
+        var minutes = info.event.end ? (minsOf(info.event.end) - start) : 30;
+        info.event.remove();
+        putBlock({id:uid("b"), taskId:taskId, date:curDate, startMin:Math.round(start/SNAP)*SNAP, durMin:clampDur(minutes), done:false});
+      },
+      eventDrop: function(info){
+        var b = blocks.get(info.event.id);
+        if(!b){ info.revert(); return; }
+        var d = info.event.start;
+        b.date = d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+        b.startMin = Math.round(minsOf(d)/SNAP)*SNAP;
+        putBlock(b);
+      },
+      eventResize: function(info){
+        var b = blocks.get(info.event.id);
+        if(!b){ info.revert(); return; }
+        b.startMin = Math.round(minsOf(info.event.start)/SNAP)*SNAP;
+        b.durMin = clampDur(minsOf(info.event.end) - minsOf(info.event.start));
+        putBlock(b);
+      },
+      eventClick: function(info){
+        var b = blocks.get(info.event.id);
+        if(b) openBlockSheet(b);
+      }
+    });
+    calendar.render();
+
+    new FullCalendar.Draggable(document.getElementById("board"), {
+      itemSelector: ".card",
+      eventData: function(el){
+        var t = tasks.get(el.dataset.id);
+        if(!t) return {};
+        return {
+          title: t.title,
+          duration: {minutes: t.estMin || 30},
+          backgroundColor: t.color,
+          borderColor: t.color,
+          extendedProps: {taskId: t.id}
+        };
+      }
+    });
+  }
+
+  /* ---------- range ---------- */
+  /* slot 0 means "fit the window": divide the space the grid actually has by the number
+     of 10-minute rows, so the whole day is on screen at the largest size that fits. */
+  function autoSlotHeight(){
+    var cal = document.getElementById("cal");
+    if(!calendar || !cal.clientHeight) return 9;
+    var scroller = cal.querySelector(".fc-scroller-liquid-absolute");
+    var avail;
+    if(scroller && scroller.clientHeight){
+      avail = scroller.clientHeight - 2;
+    } else {
+      var toolbar = cal.querySelector(".fc-header-toolbar");
+      var head = cal.querySelector(".fc-scrollgrid-section-header");
+      avail = cal.clientHeight - (toolbar ? toolbar.offsetHeight : 0) - (head ? head.offsetHeight : 0) - 24;
+    }
+    var slots = (view.to - view.from) * 6;
+    // Never go below 8px: under that the hour labels stop being legible, and an
+    // internal scroll is better than an unreadable grid.
+    return Math.max(8, Math.floor(avail / slots * 100) / 100);
+  }
+  function applySlotHeight(){
+    var h = view.slot > 0 ? view.slot : autoSlotHeight();
+    var s = document.documentElement.style;
+    s.setProperty("--slot-h", h + "px");
+    s.setProperty("--label-fs", Math.max(7, Math.min(10.5, h - 1)) + "px");
+    if(calendar) calendar.updateSize();
+  }
+  var fitTimer = 0;
+  window.addEventListener("resize", function(){
+    if(view.slot > 0) return;
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(applySlotHeight, 150);
+  });
+  function saveView(){
+    try{ localStorage.setItem(LS_KEY+"-range", JSON.stringify(view)); }catch(e){}
+  }
+
+  function initRange(){
+    var from = document.getElementById("r-from"), to = document.getElementById("r-to"), dens = document.getElementById("r-dens");
+    function opt(h){ var o = document.createElement("option"); o.value = String(h); o.textContent = pad(h)+":00"; return o; }
+    for(var h=0; h<=23; h++) from.appendChild(opt(h));
+    for(var k=1; k<=24; k++) to.appendChild(opt(k));
+    from.value = String(view.from); to.value = String(view.to); dens.value = String(view.slot);
+    function apply(ev){
+      var f = +from.value, t = +to.value;
+      if(f >= t){
+        if(ev.target === from){ t = Math.min(24, f+1); to.value = String(t); }
+        else { f = Math.max(0, t-1); from.value = String(f); }
+      }
+      view.from = f; view.to = t;
+      saveView();
+      calendar.setOption("slotMinTime", pad(f)+":00:00");
+      calendar.setOption("slotMaxTime", (t===24 ? "24:00:00" : pad(t)+":00:00"));
+      applySlotHeight();
+    }
+    from.addEventListener("change", apply);
+    to.addEventListener("change", apply);
+    dens.addEventListener("change", function(){
+      view.slot = +dens.value;
+      saveView();
+      applySlotHeight();
+    });
+  }
+
+  /* ---------- sheets ---------- */
+  var scrim = null;
+  function closeSheet(){ if(scrim){ scrim.remove(); scrim = null; } }
+  function openScrim(){
+    closeSheet();
+    scrim = document.createElement("div");
+    scrim.className = "scrim";
+    scrim.addEventListener("click", function(e){ if(e.target === scrim) closeSheet(); });
+    document.body.appendChild(scrim);
+    return scrim;
+  }
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeSheet(); });
+
+  function openTaskSheet(task){
+    var s = openScrim();
+    var est = [10,20,30,45,60,90,120,180];
+    var sheet = document.createElement("div");
+    sheet.className = "sheet";
+    sheet.innerHTML =
+      '<h3>' + esc(tr("taskSheetTitle")) + '</h3>' +
+      '<div class="field"><label for="f-title">' + esc(tr("fTitle")) + '</label><input id="f-title" maxlength="80"></div>' +
+      '<div class="field"><label for="f-note">' + esc(tr("fNote")) + '</label><textarea id="f-note" maxlength="1000" rows="3" placeholder="' + esc(tr("fNotePlaceholder")) + '"></textarea></div>' +
+      '<div class="field"><label for="f-col">' + esc(tr("fCol")) + '</label><select id="f-col">' +
+        COLUMNS.map(function(c){ return '<option value="'+c.id+'">'+esc(tr(c.key))+'</option>'; }).join("") +
+      '</select></div>' +
+      '<div class="field"><label for="f-est">' + esc(tr("fEst")) + '</label><select id="f-est">' +
+        est.map(function(m){ return '<option value="'+m+'">'+esc(fmtMin(m))+'</option>'; }).join("") +
+      '</select></div>' +
+      '<div class="field"><label>' + esc(tr("fColor")) + '</label><div class="swatches" id="f-colors"></div></div>' +
+      '<div class="sheet-actions">' +
+        '<button class="danger" id="f-del" type="button">' + esc(tr("del")) + '</button>' +
+        '<span class="spacer"></span>' +
+        '<button class="ghost" id="f-cancel" type="button">' + esc(tr("close")) + '</button>' +
+        '<button class="primary" id="f-save" type="button">' + esc(tr("save")) + '</button>' +
+      '</div>';
+    s.appendChild(sheet);
+
+    sheet.querySelector("#f-title").value = task.title;
+    sheet.querySelector("#f-note").value = task.note || "";
+    sheet.querySelector("#f-col").value = task.col;
+    sheet.querySelector("#f-est").value = String(est.indexOf(task.estMin) >= 0 ? task.estMin : 30);
+    var picked = task.color;
+    var sw = sheet.querySelector("#f-colors");
+    COLORS.forEach(function(c){
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "sw"; b.style.background = c;
+      b.setAttribute("aria-pressed", c === picked ? "true" : "false");
+      b.setAttribute("aria-label", tr("fColor") + " " + c);
+      b.addEventListener("click", function(){
+        picked = c;
+        Array.prototype.forEach.call(sw.children, function(x){ x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      });
+      sw.appendChild(b);
+    });
+    sheet.querySelector("#f-cancel").addEventListener("click", closeSheet);
+    sheet.querySelector("#f-del").addEventListener("click", function(){ dropTask(task.id); closeSheet(); });
+    sheet.querySelector("#f-save").addEventListener("click", function(){
+      var title = sheet.querySelector("#f-title").value.trim();
+      if(!title) return;
+      task.title = title;
+      task.note = sheet.querySelector("#f-note").value.trim();
+      task.col = sheet.querySelector("#f-col").value;
+      task.estMin = +sheet.querySelector("#f-est").value;
+      task.color = picked;
+      putTask(task);
+      closeSheet();
+    });
+    sheet.querySelector("#f-title").focus();
+  }
+
+  function openBlockSheet(b){
+    var s = openScrim();
+    var t = tasks.get(b.taskId);
+    var sheet = document.createElement("div");
+    sheet.className = "sheet";
+    sheet.innerHTML =
+      '<h3></h3>' +
+      '<div class="field"><label>' + esc(tr("bWhen")) + '</label><div class="when" style="font-family:var(--font-mono);font-size:15px;font-variant-numeric:tabular-nums"></div></div>' +
+      '<div class="field"><label for="b-dur">' + esc(tr("bDur")) + '</label><select id="b-dur"></select></div>' +
+      '<div class="field"><label>' + esc(tr("bThis")) + '</label><div class="seg" id="b-done"></div></div>' +
+      '<div class="field"><label>' + esc(tr("bTaskState")) + '</label><div class="seg" id="b-col"></div></div>' +
+      (t && t.note ? '<div class="field"><label>' + esc(tr("fNote")) + '</label><div class="readnote"></div></div>' : '') +
+      '<div class="sheet-actions">' +
+        '<button class="danger" id="b-del" type="button">' + esc(tr("bRemove")) + '</button>' +
+        '<span class="spacer"></span>' +
+        '<button class="ghost" id="b-cancel" type="button">' + esc(tr("close")) + '</button>' +
+      '</div>';
+    s.appendChild(sheet);
+    sheet.querySelector("h3").textContent = t ? t.title : tr("deletedTask");
+    if(t && t.note) sheet.querySelector(".readnote").textContent = t.note;
+    function stamp(){
+      sheet.querySelector(".when").textContent = hhmm(b.startMin) + " – " + hhmm(Math.min(24*60, b.startMin + b.durMin));
+    }
+    stamp();
+    var sel = sheet.querySelector("#b-dur");
+    for(var m = SNAP; m <= 300; m += SNAP){
+      var o = document.createElement("option");
+      o.value = String(m);
+      o.textContent = fmtMin(m);
+      sel.appendChild(o);
+    }
+    sel.value = String(b.durMin);
+    sel.addEventListener("change", function(){ b.durMin = +sel.value; putBlock(b); stamp(); });
+
+    var doneSeg = sheet.querySelector("#b-done");
+    [{v:false, key:"notYet"}, {v:true, key:"doneSeg"}].forEach(function(o){
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = tr(o.key);
+      btn.setAttribute("aria-pressed", !!b.done === o.v ? "true" : "false");
+      btn.addEventListener("click", function(){
+        b.done = o.v;
+        putBlock(b);
+        Array.prototype.forEach.call(doneSeg.children, function(x){
+          x.setAttribute("aria-pressed", x === btn ? "true" : "false");
+        });
+      });
+      doneSeg.appendChild(btn);
+    });
+
+    var seg = sheet.querySelector("#b-col");
+    if(t){
+      COLUMNS.forEach(function(c){
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = tr(c.key);
+        btn.setAttribute("aria-pressed", t.col === c.id ? "true" : "false");
+        btn.addEventListener("click", function(){
+          setTaskColumn(t.id, c.id);
+          Array.prototype.forEach.call(seg.children, function(x){
+            x.setAttribute("aria-pressed", x === btn ? "true" : "false");
+          });
+        });
+        seg.appendChild(btn);
+      });
+    } else {
+      seg.textContent = "—";
+    }
+    sheet.querySelector("#b-del").addEventListener("click", function(){ dropBlock(b.id); closeSheet(); });
+    sheet.querySelector("#b-cancel").addEventListener("click", closeSheet);
+  }
+
+  /* ---------- add / export / import ---------- */
+  document.getElementById("add-form").addEventListener("submit", function(e){
+    e.preventDefault();
+    var input = document.getElementById("add-title");
+    var title = input.value.trim();
+    if(!title) return;
+    putTask({id:uid("t"), title:title, note:"", col:"todo", estMin:30, color:COLORS[tasks.size % COLORS.length], order:Date.now()});
+    input.value = "";
+    input.focus();
+  });
+
+  var toastEl = null, toastTimer = 0;
+  function toast(msg){
+    if(toastEl) toastEl.remove();
+    toastEl = document.createElement("div");
+    toastEl.className = "toast";
+    toastEl.textContent = msg;
+    document.body.appendChild(toastEl);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ if(toastEl){ toastEl.remove(); toastEl = null; } }, 2600);
+  }
+
+  document.getElementById("btn-export").addEventListener("click", function(){
+    var body = JSON.stringify({version:1, exportedAt:new Date().toISOString(), tasks:Array.from(tasks.values()), blocks:Array.from(blocks.values())}, null, 2);
+    var url = URL.createObjectURL(new Blob([body], {type:"application/json"}));
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "day-planner-" + todayStr() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  });
+
+  document.getElementById("btn-import").addEventListener("click", function(){
+    document.getElementById("file-import").click();
+  });
+  document.getElementById("file-import").addEventListener("change", function(e){
+    var f = e.target.files && e.target.files[0];
+    if(!f) return;
+    var r = new FileReader();
+    r.onload = function(){
+      try{
+        var d = JSON.parse(String(r.result));
+        if(!d || (!d.tasks && !d.blocks)) throw new Error(tr("errFormat"));
+        adopt(d); save(); renderAll();
+        toast(tr("toastImported", {n: tasks.size}));
+      }catch(err){
+        toast(tr("toastImportFail", {msg: err.message}));
+      }
+      e.target.value = "";
+    };
+    r.readAsText(f);
+  });
+
+  /* ---------- language picker ---------- */
+  function initLang(){
+    var sel = document.getElementById("r-lang");
+    LANGS.forEach(function(l){
+      var o = document.createElement("option");
+      o.value = l.code;
+      o.textContent = l.name;
+      sel.appendChild(o);
+    });
+    sel.value = lang;
+    sel.addEventListener("change", function(){
+      if(!STR[sel.value]) return;
+      lang = sel.value;
+      try{ localStorage.setItem(LS_LANG, lang); }catch(e){}
+      applyStatic();
+      if(calendar) calendar.setOption("locale", fcLocale());
+      renderAll();
+    });
+  }
+
+  /* ---------- boot ---------- */
+  registerLocales();
+  applyStatic();
+  load();
+  applySlotHeight();
+  initCalendar();
+  initRange();
+  initLang();
+  applySlotHeight();
+  renderAll();
+})();
+</script>
+</body>
+</html>

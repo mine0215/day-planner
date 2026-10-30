@@ -1,0 +1,14 @@
+# Editor / agent local config
+.claude/
+.vscode/
+.idea/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Exported data — these are personal task files, not part of the project
+day-planner-*.json
+
+node_modules/
