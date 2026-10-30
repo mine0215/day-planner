@@ -1,12 +1,16 @@
 # Day Planner
 
+**[Open it in your browser →](https://mine0215.github.io/day-planner/)**
+
 A task board and a 10-minute day timetable, side by side, in one HTML file.
+Nothing you type is sent anywhere — the hosted copy runs entirely in your own browser,
+exactly like the downloaded file.
 
 Drag a card from the board onto the day to schedule it — **the card stays on the board**. A task
 can be planned several times across the day, and the board keeps showing what the task *is*
 while the timetable shows when you intend to work on it.
 
-- **One file.** `planner.html` plus a vendored copy of FullCalendar. No build step, no install.
+- **One file.** `index.html` plus a vendored copy of FullCalendar. No build step, no install.
 - **No network.** Nothing is fetched at runtime, and nothing is ever sent anywhere.
 - **Your data stays in your browser.** Everything lives in `localStorage`, with JSON export/import.
 - **10-minute grid**, 8:00–19:00 by default, adjustable, with a density control.
@@ -14,7 +18,7 @@ while the timetable shows when you intend to work on it.
 
 ## Getting started
 
-Download the repository and open `planner.html` in a browser. That is the whole setup.
+Download the repository and open `index.html` in a browser. That is the whole setup.
 
 If your browser restricts `file://` pages, serve the folder locally instead:
 
@@ -64,7 +68,7 @@ selected language without any extra locale files.
 
 ### Adding a language
 
-Everything lives in two places near the top of the `<script>` block in `planner.html`:
+Everything lives in two places near the top of the `<script>` block in `index.html`:
 
 1. Add an entry to `LANGS`:
 
@@ -86,7 +90,7 @@ Right-to-left scripts are not handled yet — the layout has no RTL support.
 
 | File | What it is |
 |---|---|
-| `planner.html` | The whole application |
+| `index.html` | The whole application |
 | `vendor/fullcalendar.min.js` | FullCalendar 6.1.15, vendored so the page works offline |
 | `serve.js` | A ~30-line static server, for browsers that restrict `file://` |
 | `theme-quiet-desk.md` | The colour and density decisions behind the UI |
@@ -126,13 +130,17 @@ FullCalendar is bundled under its own MIT license; see
 
 # Day Planner（日本語）
 
+**[ブラウザで開く →](https://mine0215.github.io/day-planner/)**
+
 タスク盤と、10分刻みの1日の時間割を並べた、HTML 1枚のツールです。
+上のリンクで開いた場合も、入力した内容は**あなたのブラウザの中だけ**に保存されます。
+どこにも送信されません。
 
 盤からカードを時間割へドラッグすると予定になりますが、**カードは盤から消えません**。同じタスクを
 1日に何度でも置けます。盤は「その案件が今どうなっているか」を、時間割は「いつ手を動かすか」を
 それぞれ受け持ちます。
 
-- **ファイル1枚。** `planner.html` と同梱の FullCalendar だけ。ビルドも導入作業も不要です
+- **ファイル1枚。** `index.html` と同梱の FullCalendar だけ。ビルドも導入作業も不要です
 - **通信しません。** 実行時に何も取得せず、どこへも送信しません
 - **データはブラウザの中だけ。** `localStorage` に保存し、JSON で書き出し・読み込みできます
 - **10分刻み。** 既定は 8:00〜19:00 で、表示範囲と密度を変えられます
@@ -140,7 +148,7 @@ FullCalendar is bundled under its own MIT license; see
 
 ## 使い始める
 
-リポジトリをダウンロードして `planner.html` をブラウザで開くだけです。
+リポジトリをダウンロードして `index.html` をブラウザで開くだけです。
 
 ブラウザが `file://` を制限している場合は、ローカルサーバー経由で開いてください。
 
@@ -171,7 +179,7 @@ node serve.js 8731
 
 ## 言語を追加する
 
-`planner.html` の `<script>` 冒頭にある `LANGS` に1行足し、`STR` の `en` ブロックを
+`index.html` の `<script>` 冒頭にある `LANGS` に1行足し、`STR` の `en` ブロックを
 コピーして翻訳するだけです。足りないキーは英語にフォールバックするので、途中まででも動きます。
 プルリクエストを歓迎します。
 

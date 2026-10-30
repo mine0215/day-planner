@@ -34,7 +34,7 @@ http.createServer((req, res) => {
     return send(res, 400, "bad request");
   }
   if (rel.indexOf("\0") !== -1) return send(res, 400, "bad request");
-  if (rel === "/") rel = "/planner.html";
+  if (rel === "/") rel = "/index.html";
 
   const norm = path.normalize(rel).replace(/^[\\/]+/, "");
   // Never serve dotfiles: .git holds repository internals and may hold credentials.
