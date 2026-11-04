@@ -76,7 +76,12 @@ h1{font-size:16px;font-weight:700;margin:0;letter-spacing:.02em}
 .board-head h2{font-size:13px;font-weight:700;margin:0;letter-spacing:.08em;color:var(--ink-soft)}
 .hint{font-size:11.5px;color:var(--ink-soft);margin:0 0 12px;line-height:1.5}
 .cols{display:flex;flex-direction:column;gap:14px}
-.col-head{display:flex;align-items:center;gap:7px;width:100%;padding:3px 2px;margin-bottom:6px;border:0;background:transparent;cursor:pointer;
+.col-head-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.col-clear{flex:0 0 auto;border:1px solid var(--line);background:transparent;color:var(--ink-soft);
+  border-radius:5px;padding:2px 7px;font-size:10.5px;cursor:pointer;white-space:nowrap}
+.col-clear:hover{background:var(--signal);border-color:var(--signal);color:#fff}
+.col-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 2px 7px;opacity:.85}
+.col-head{display:flex;align-items:center;gap:7px;width:100%;padding:3px 2px;border:0;background:transparent;cursor:pointer;
   font-size:12px;font-weight:700;color:var(--ink-soft);letter-spacing:.06em;text-align:left;border-radius:5px}
 .col-head:hover{background:var(--panel-2);color:var(--ink)}
 .col-head .count{font-family:var(--font-mono);font-weight:600;opacity:.8;margin-left:auto}
@@ -165,6 +170,7 @@ button.danger:hover{background:var(--signal);color:#fff}
 .scrim{position:fixed;inset:0;background:rgba(10,12,16,.5);display:flex;align-items:center;justify-content:center;padding:20px;z-index:40}
 .sheet{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;width:min(380px,100%);display:flex;flex-direction:column;gap:12px}
 .sheet h3{margin:0;font-size:15px}
+.confirm-body{margin:0;font-size:12.5px;line-height:1.6;color:var(--ink-soft)}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:11.5px;letter-spacing:.06em;color:var(--ink-soft)}
 .field input,.field select,.field textarea{padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);font-size:13px}
@@ -278,6 +284,10 @@ footer.note code{font-family:var(--font-mono)}
       toastImported:"Imported ({n} tasks)", toastImportFail:"Could not import: {msg}",
       errFormat:"unrecognised format",
       demoNotice:"This is the hosted copy — what you enter stays in this tab only and is gone when you close it.", demoGet:"Download it to keep your work",
+      clearDone:"Clear all", clearTitle:"Clear completed tasks",
+      autoDeleteNote:"Removed automatically 24 hours after being finished.",
+      clearBody:"This removes {n} completed tasks and the {b} blocks scheduled for them. It cannot be undone.",
+      clearConfirm:"Delete them", toastCleared:"Cleared {n} tasks",
       durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
     },
     ja:{
@@ -302,6 +312,10 @@ footer.note code{font-family:var(--font-mono)}
       toastImported:"読み込みました（タスク {n} 件）", toastImportFail:"読み込めませんでした: {msg}",
       errFormat:"形式が違います",
       demoNotice:"これは公開版です。入力した内容はこのタブの中だけに残り、閉じると消えます。", demoGet:"保存して使うにはダウンロード",
+      clearDone:"すべて消す", clearTitle:"完了したタスクを消す",
+      autoDeleteNote:"完了から24時間で自動的に消えます。",
+      clearBody:"完了タスク {n} 件と、それに紐づく予定 {b} 件を消します。元に戻せません。",
+      clearConfirm:"消す", toastCleared:"{n} 件を消しました",
       durM:"{m}分", durH:"{h}時間", durHM:"{h}時間{m}分"
     },
     "zh-Hans":{
@@ -326,6 +340,10 @@ footer.note code{font-family:var(--font-mono)}
       toastImported:"已导入（{n} 个任务）", toastImportFail:"无法导入：{msg}",
       errFormat:"格式不正确",
       demoNotice:"这是在线版。您输入的内容只保存在当前标签页中，关闭后即消失。", demoGet:"下载后可长期保存",
+      clearDone:"全部清除", clearTitle:"清除已完成的任务",
+      autoDeleteNote:"完成 24 小时后自动删除。",
+      clearBody:"将删除 {n} 个已完成任务，以及为它们安排的 {b} 个时段。此操作无法撤销。",
+      clearConfirm:"删除", toastCleared:"已清除 {n} 个任务",
       durM:"{m} 分钟", durH:"{h} 小时", durHM:"{h} 小时 {m} 分"
     },
     "zh-Hant":{
@@ -350,6 +368,10 @@ footer.note code{font-family:var(--font-mono)}
       toastImported:"已匯入（{n} 個任務）", toastImportFail:"無法匯入：{msg}",
       errFormat:"格式不正確",
       demoNotice:"這是線上版。您輸入的內容只保存在目前分頁中，關閉後即消失。", demoGet:"下載後可長期保存",
+      clearDone:"全部清除", clearTitle:"清除已完成的任務",
+      autoDeleteNote:"完成 24 小時後自動刪除。",
+      clearBody:"將刪除 {n} 個已完成任務，以及為它們安排的 {b} 個時段。此操作無法復原。",
+      clearConfirm:"刪除", toastCleared:"已清除 {n} 個任務",
       durM:"{m} 分鐘", durH:"{h} 小時", durHM:"{h} 小時 {m} 分"
     },
     ko:{
@@ -374,6 +396,10 @@ footer.note code{font-family:var(--font-mono)}
       toastImported:"가져왔습니다(작업 {n}개)", toastImportFail:"가져올 수 없습니다: {msg}",
       errFormat:"형식이 올바르지 않습니다",
       demoNotice:"이것은 온라인 버전입니다. 입력한 내용은 이 탭에만 남고 닫으면 사라집니다.", demoGet:"저장해서 쓰려면 다운로드",
+      clearDone:"모두 지우기", clearTitle:"완료한 작업 지우기",
+      autoDeleteNote:"완료 후 24시간이 지나면 자동으로 삭제됩니다.",
+      clearBody:"완료한 작업 {n}개와 거기에 잡아둔 일정 {b}개를 지웁니다. 되돌릴 수 없습니다.",
+      clearConfirm:"지우기", toastCleared:"{n}개를 지웠습니다",
       durM:"{m}분", durH:"{h}시간", durHM:"{h}시간 {m}분"
     },
     es:{
@@ -398,6 +424,10 @@ footer.note code{font-family:var(--font-mono)}
       toastImported:"Importado ({n} tareas)", toastImportFail:"No se pudo importar: {msg}",
       errFormat:"formato no reconocido",
       demoNotice:"Esta es la copia alojada: lo que escribas se queda solo en esta pestaña y desaparece al cerrarla.", demoGet:"Descárgalo para conservar tu trabajo",
+      clearDone:"Borrar todo", clearTitle:"Borrar tareas hechas",
+      autoDeleteNote:"Se eliminan automáticamente 24 horas después de completarse.",
+      clearBody:"Se eliminarán {n} tareas hechas y los {b} bloques programados para ellas. No se puede deshacer.",
+      clearConfirm:"Eliminar", toastCleared:"{n} tareas eliminadas",
       durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
     },
     "pt-BR":{
@@ -422,6 +452,10 @@ footer.note code{font-family:var(--font-mono)}
       toastImported:"Importado ({n} tarefas)", toastImportFail:"Não foi possível importar: {msg}",
       errFormat:"formato não reconhecido",
       demoNotice:"Esta é a cópia hospedada: o que você digitar fica apenas nesta aba e some ao fechá-la.", demoGet:"Baixe para manter seu trabalho",
+      clearDone:"Limpar tudo", clearTitle:"Limpar tarefas concluídas",
+      autoDeleteNote:"Removidas automaticamente 24 horas após a conclusão.",
+      clearBody:"Isso remove {n} tarefas concluídas e os {b} blocos agendados para elas. Não é possível desfazer.",
+      clearConfirm:"Excluir", toastCleared:"{n} tarefas removidas",
       durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
     },
     fr:{
@@ -446,6 +480,10 @@ footer.note code{font-family:var(--font-mono)}
       toastImported:"Importé ({n} tâches)", toastImportFail:"Import impossible : {msg}",
       errFormat:"format non reconnu",
       demoNotice:"Ceci est la copie hébergée : ce que vous saisissez reste dans cet onglet et disparaît à sa fermeture.", demoGet:"Téléchargez-le pour conserver votre travail",
+      clearDone:"Tout effacer", clearTitle:"Effacer les tâches terminées",
+      autoDeleteNote:"Supprimées automatiquement 24 heures après leur achèvement.",
+      clearBody:"{n} tâches terminées et les {b} créneaux programmés pour elles seront supprimés. C'est irréversible.",
+      clearConfirm:"Supprimer", toastCleared:"{n} tâches supprimées",
       durM:"{m} min", durH:"{h} h", durHM:"{h} h {m} min"
     },
     de:{
@@ -470,6 +508,10 @@ footer.note code{font-family:var(--font-mono)}
       toastImported:"Importiert ({n} Aufgaben)", toastImportFail:"Import fehlgeschlagen: {msg}",
       errFormat:"unbekanntes Format",
       demoNotice:"Dies ist die gehostete Kopie: Eingaben bleiben nur in diesem Tab und sind nach dem Schließen weg.", demoGet:"Zum dauerhaften Speichern herunterladen",
+      clearDone:"Alle löschen", clearTitle:"Erledigte Aufgaben löschen",
+      autoDeleteNote:"Werden 24 Stunden nach Abschluss automatisch gelöscht.",
+      clearBody:"Dies löscht {n} erledigte Aufgaben und die {b} dafür geplanten Blöcke. Das lässt sich nicht rückgängig machen.",
+      clearConfirm:"Löschen", toastCleared:"{n} Aufgaben gelöscht",
       durM:"{m} Min.", durH:"{h} Std.", durHM:"{h} Std. {m} Min."
     },
     ru:{
@@ -494,6 +536,10 @@ footer.note code{font-family:var(--font-mono)}
       toastImported:"Импортировано (задач: {n})", toastImportFail:"Не удалось импортировать: {msg}",
       errFormat:"неизвестный формат",
       demoNotice:"Это онлайн-версия: введённое остаётся только в этой вкладке и исчезает при её закрытии.", demoGet:"Скачайте, чтобы сохранять работу",
+      clearDone:"Очистить все", clearTitle:"Удалить выполненные задачи",
+      autoDeleteNote:"Удаляются автоматически через 24 часа после завершения.",
+      clearBody:"Будут удалены выполненные задачи ({n}) и запланированные для них блоки ({b}). Отменить это нельзя.",
+      clearConfirm:"Удалить", toastCleared:"Удалено задач: {n}",
       durM:"{m} мин", durH:"{h} ч", durHM:"{h} ч {m} мин"
     }
   };
@@ -644,7 +690,10 @@ footer.note code{font-family:var(--font-mono)}
         col: COL_IDS.indexOf(t.col) >= 0 ? t.col : "todo",
         estMin: asNum(t.estMin, SNAP, 24*60, 30),
         color: asColor(t.color),
-        order: asNum(t.order, 0, Number.MAX_SAFE_INTEGER, 0)
+        order: asNum(t.order, 0, Number.MAX_SAFE_INTEGER, 0),
+        // Tasks saved before "done" was timestamped start their day now, so upgrading
+        // never wipes a column that was finished long ago.
+        doneAt: t.col === "done" ? asNum(t.doneAt, 0, Number.MAX_SAFE_INTEGER, Date.now()) || Date.now() : 0
       });
     });
     (Array.isArray(d.blocks) ? d.blocks : []).forEach(function(b){
@@ -673,11 +722,31 @@ footer.note code{font-family:var(--font-mono)}
     }catch(e){ toast(tr("toastSaveFail")); }
   }
 
-  function putTask(t){ tasks.set(t.id,t); save(); renderAll(); }
-  function dropTask(id){
+  var DONE_TTL = 24*60*60*1000; // finished tasks are swept 24h after they land in "done"
+
+  function putTask(t){
+    // Stamped here rather than at each call site, so every route into "done" is covered:
+    // dragging onto the column, the block sheet's buttons, and the task sheet's select.
+    if(t.col === "done"){ if(!t.doneAt) t.doneAt = Date.now(); }
+    else { t.doneAt = 0; }
+    tasks.set(t.id,t); save(); renderAll();
+  }
+  function purge(id){
     tasks.delete(id);
     Array.from(blocks.values()).forEach(function(b){ if(b.taskId===id) blocks.delete(b.id); });
-    save(); renderAll();
+  }
+  function dropTask(id){ purge(id); save(); renderAll(); }
+
+  /* Sweep finished tasks once they are a day old. Timestamps are absolute, so this works
+     across sessions: a task finished yesterday is gone the next time the page opens, and a
+     tab left open all day is swept by the interval below. */
+  function sweepDone(){
+    var cutoff = Date.now() - DONE_TTL, gone = 0;
+    Array.from(tasks.values()).forEach(function(t){
+      if(t.col === "done" && t.doneAt && t.doneAt <= cutoff){ purge(t.id); gone++; }
+    });
+    if(gone){ save(); renderAll(); }
+    return gone;
   }
   function putBlock(b){ blocks.set(b.id,b); save(); renderAll(); }
   function dropBlock(id){ blocks.delete(id); save(); renderAll(); }
@@ -711,6 +780,11 @@ footer.note code{font-family:var(--font-mono)}
       wrap.className = "col";
       wrap.dataset.col = col.id;
 
+      /* The toggle and the clear button are siblings in a row: a button cannot be nested
+         inside another button, and the whole header used to be one. */
+      var headRow = document.createElement("div");
+      headRow.className = "col-head-row";
+
       var head = document.createElement("button");
       head.type = "button";
       head.className = "col-head";
@@ -719,7 +793,28 @@ footer.note code{font-family:var(--font-mono)}
                        '<span class="count">' + list.length + '</span>';
       head.querySelector(".label").textContent = tr(col.key);
       head.addEventListener("click", function(){ toggleColumn(col.id); });
-      wrap.appendChild(head);
+      headRow.appendChild(head);
+
+      /* Finished tasks are never removed on their own, so the done column needs a way out
+         that is not "open each card and delete it". */
+      if(col.id === "done" && list.length){
+        var clr = document.createElement("button");
+        clr.type = "button";
+        clr.className = "col-clear";
+        clr.textContent = tr("clearDone");
+        clr.addEventListener("click", function(ev){ ev.stopPropagation(); confirmClearDone(); });
+        headRow.appendChild(clr);
+      }
+      wrap.appendChild(headRow);
+
+      /* Say that the column empties itself. Data disappearing without warning would be
+         worse than the clutter it replaces. */
+      if(col.id === "done" && list.length && !collapsed){
+        var note = document.createElement("div");
+        note.className = "col-note";
+        note.textContent = tr("autoDeleteNote");
+        wrap.appendChild(note);
+      }
 
       var ul = document.createElement("div");
       ul.className = "col-list";
@@ -992,6 +1087,39 @@ footer.note code{font-family:var(--font-mono)}
   }
   document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeSheet(); });
 
+  /* Clearing the column is destructive and silent otherwise, so it says what will go. */
+  function confirmClearDone(){
+    var list = tasksIn("done");
+    if(!list.length) return;
+    var ids = {}; list.forEach(function(t){ ids[t.id] = true; });
+    var nBlocks = 0;
+    blocks.forEach(function(b){ if(ids[b.taskId]) nBlocks++; });
+
+    var s = openScrim();
+    var sheet = document.createElement("div");
+    sheet.className = "sheet";
+    sheet.innerHTML =
+      '<h3></h3><p class="confirm-body"></p>' +
+      '<div class="sheet-actions">' +
+        '<span class="spacer"></span>' +
+        '<button class="ghost" id="c-cancel" type="button"></button>' +
+        '<button class="danger" id="c-ok" type="button"></button>' +
+      '</div>';
+    s.appendChild(sheet);
+    sheet.querySelector("h3").textContent = tr("clearTitle");
+    sheet.querySelector(".confirm-body").textContent = tr("clearBody", {n: list.length, b: nBlocks});
+    sheet.querySelector("#c-cancel").textContent = tr("close");
+    sheet.querySelector("#c-ok").textContent = tr("clearConfirm");
+    sheet.querySelector("#c-cancel").addEventListener("click", closeSheet);
+    sheet.querySelector("#c-ok").addEventListener("click", function(){
+      var n = list.length;
+      list.forEach(function(t){ purge(t.id); });
+      save(); renderAll(); closeSheet();
+      toast(tr("toastCleared", {n: n}));
+    });
+    sheet.querySelector("#c-ok").focus();
+  }
+
   function openTaskSheet(task){
     var s = openScrim();
     var est = [10,20,30,45,60,90,120,180];
@@ -1213,6 +1341,8 @@ footer.note code{font-family:var(--font-mono)}
   applyStatic();
   applyDemoNotice();
   load();
+  sweepDone();
+  setInterval(sweepDone, 5*60*1000);
   applySlotHeight();
   initCalendar();
   initRange();

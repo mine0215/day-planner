@@ -46,6 +46,22 @@ on the task.
 
 Click a block to set either one.
 
+### The done column empties itself
+
+A finished task is removed **24 hours after it was moved into *Done***, along with any blocks
+scheduled for it. The clock starts when the task lands in the column and resets if you move it
+back out, so nothing disappears while you are still working on it. The column says so on screen
+whenever it holds anything.
+
+There is also a **Clear all** button on the column, which says how many tasks and blocks it is
+about to remove before it does. Deleting a single task from its card has always removed that
+task's blocks too; this is the same thing in bulk.
+
+Upgrading is safe: tasks finished before this existed have no timestamp, so they are given a
+full day from the first time the new version opens rather than being swept immediately.
+
+To keep finished tasks for longer, change `DONE_TTL` in `index.html`.
+
 ### Storage
 
 | Key | Holds |
@@ -197,6 +213,18 @@ node serve.js 8731
 きちんと終わった扱いになります。**消化の記録はタスクではなくブロックに付く**ためです。
 
 予定をクリックすると、どちらも切り替えられます。
+
+## 完了列は自動で空になります
+
+完了したタスクは、**完了列に入れてから24時間で**、その案件の予定ごと消えます。
+時計は完了列に入った時点から動き、**列から出せばリセット**されるので、作業中のものが消えることはありません。
+列に中身があるときは、その旨が画面に表示されます。
+
+列には**「すべて消す」ボタン**もあります。押すと「何件のタスクと何件の予定を消すか」を表示してから実行します。
+
+**更新しても既存の完了タスクはすぐには消えません。** 時刻が記録されていないものは、新しい版を最初に開いた時点から24時間が与えられます。
+
+保持期間を変えたい場合は `index.html` の `DONE_TTL` を変更してください。
 
 ## 保存について
 
